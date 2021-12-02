@@ -2,12 +2,12 @@ import logging
 import os
 
 import configargparse
-import msal
 from concurrent_log_handler.queue import setup_logging_queues
 from prometheus_client import Info, start_http_server
 
 from ._version import __version__
-from .authenticator import AADAuthenticator, AADAuthenticatorFlows
+from .authenticator import AADAuthenticatorFlows
+from .duo_authenticator import DuoAuthenticator
 
 
 def main():
@@ -38,6 +38,23 @@ def main():
         env_var="AAD_THREAD_COUNT",
         help="Amount of threads to handle authentication",
         type=int,
+    )
+
+    parser_duo = parser.add_argument_group("duo")
+    parser_duo.add_argument(
+        "--ikey",
+        help="duo integration key",
+        env_var="DUO_INTEGRATION_KEY",
+    )
+    parser_duo.add_argument(
+        "--skey",
+        help="duo secret key",
+        env_var="DUO_SECRET_KEY",
+    )
+    parser_duo.add_argument(
+        "--api-host",
+        help="duo api host",
+        env_var="DUO_API_HOST",
     )
 
     parser_authentication = parser.add_argument_group("OpenVPN User Authentication")
@@ -170,23 +187,18 @@ def main():
         i = Info("openvpn_auth_azure_ad_version", "info of openvpn-auth-azure-ad")
         i.info({"version": __version__})
 
-    app = msal.PublicClientApplication(
-        options.client_id, authority=options.token_authority
+    # app = msal.PublicClientApplication(
+    #     options.client_id, authority=options.token_authority
+    # )
+    #
+    authenticator = DuoAuthenticator(
+        ikey=options.ikey,
+        skey=options.skey,
+        api_host=options.api_host,
+        threads=options.threads,
+        host=options.ovpn_host,
+        port=options.ovpn_port,
+        unix_socket=options.ovpn_socket,
+        password=options.ovpn_password,
     )
-
-    authenticator = AADAuthenticator(
-        app,
-        options.graph_endpoint,
-        options.authenticators,
-        options.verify_common_name,
-        options.auth_token,
-        options.auth_token_livetime,
-        options.remember_user,
-        options.threads,
-        options.ovpn_host,
-        options.ovpn_port,
-        options.ovpn_socket,
-        options.ovpn_password,
-    )
-
     authenticator.run()

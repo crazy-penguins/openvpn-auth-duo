@@ -1,12 +1,12 @@
 [Unit]
-Description=openvpn-auth-azure-ad
+Description=openvpn-auth-duo
 After=openvpn.service
 Wants=openvpn.service
-Documentation=https://github.com/jkroepke/openvpn-auth-azure-ad
+Documentation=https://github.com/crazy-penguins/openvpn-auth-azure-ad
 
 [Service]
 PrivateTmp=true
-ExecStart=/usr/local/bin/openvpn-auth-azure-ad
+ExecStart=/usr/local/bin/openvpn-auth-duo
 ProtectSystem=true
 ProtectHome=true
 

@@ -8,8 +8,9 @@
 
 State: Proof of concept!
 
-openvpn-auth-azure-ad is an external service connects to the openvpn management interface and handle the authentication
-of connecting users against Azure AD.
+openvpn-auth-duo is an external service connects to the openvpn management
+interface and handles the authentication of connecting users with MFA via
+duo security
 
 OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
@@ -17,7 +18,7 @@ OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
 ### Python
 
-- Python 3.8
+- Python 3.8+
 
 ### Server
 
@@ -29,23 +30,15 @@ OpenVPN version 2.4 is required. 2.5 is not tested yet.
 
 # Authenticators
 
-Currently, openvpn-auth-azure-ad supports 2 authentication method against Azure AD:
+Currently, openvpn-auth-duo supports push notification via the duo security app
 
-- [device authorization grant flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code)
-- [Resource Owner Password Credentials grant](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth-ropc)
-  (not recommend, see docs for limitations)
-
-Additionally, if enabled openvpn-auth-azure-ad supports OpenVPNs `auth-token` mechanismus to allow users to bypass
-then authenticator above on re-authentications, e.g. due `reneg-sec`.
-
-`auth-gen-token` must not set on the config.
 
 # Installation
 
 ## via pip
 
 ```
-# pip install openvpn-auth-azure-ad
+# pip install openvpn-auth-duo
 ```
 
 For install pip on your system, see [pip docs](https://pip.pypa.io/en/stable/installing/).

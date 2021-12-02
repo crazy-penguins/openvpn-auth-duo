@@ -6,10 +6,9 @@ from typing import Dict, Optional
 from cacheout import CacheManager
 from msal import PublicClientApplication
 from prometheus_client import Counter
-
 from . import util
 from ._version import __version__
-from .openvpn import OpenVPNManagementInterface
+from .openvpn import ManagementInterface
 from .util import errors
 from .util.thread_pool import ThreadPoolExecutorStackTraced
 
@@ -26,7 +25,8 @@ openvpn_auth_azure_ad_auth_failures = Counter(
     "openvpn_auth_azure_ad_auth_failures", "auth failures", ["flow"]
 )
 
-logger = logging.getLogger(__name__)
+
+log = logging.getLogger(__name__)
 
 
 class AADAuthenticatorFlows:
@@ -56,7 +56,7 @@ class AADAuthenticator(object):
         self._app = app
         self._graph_endpoint = graph_endpoint
         self._authenticators = [s.strip() for s in authenticators.split(",")]
-        self._openvpn = OpenVPNManagementInterface(host, port, socket, password)
+        self._openvpn = ManagementInterface(host, port, socket, password)
         self._openvpn.connect()
         self._states = CacheManager(
             {
@@ -73,17 +73,17 @@ class AADAuthenticator(object):
         self._thread_pool = ThreadPoolExecutorStackTraced(max_workers=threads)
 
     def run(self) -> None:
-        logger.info("Running openvpn-auth-azure-ad %s" % __version__)
+        log.info("Running openvpn-auth-azure-ad %s" % __version__)
         try:
             while True:
                 message = self._openvpn.receive()
                 if not message:
-                    logger.error("Connection to OpenVPN closed. Reconnecting...")
+                    log.error("Connection to OpenVPN closed. Reconnecting...")
                     self._openvpn.connect(True)
                     continue
 
                 if message.startswith("ERROR:"):
-                    logger.error(message)
+                    log.error(message)
                     continue
 
                 if message.startswith(">CLIENT:DISCONNECT"):
@@ -100,7 +100,7 @@ class AADAuthenticator(object):
         except KeyboardInterrupt:
             pass
         except Exception as e:
-            logger.error(str(e), exc_info=e)
+            log.error(str(e), exc_info=e)
 
     def send_authentication_success(self, client: dict) -> None:
         self.log_info(client, "authentication succeeded")
@@ -458,17 +458,17 @@ class AADAuthenticator(object):
     def log_warn(self, client: dict, message: str) -> None:
         prefix = self.format_log_prefix(client)
 
-        logger.warning("[%s]: %s" % (prefix, message))
+        log.warning("[%s]: %s" % (prefix, message))
 
     def log_info(self, client: dict, message: str) -> None:
         prefix = self.format_log_prefix(client)
 
-        logger.info("[%s]: %s" % (prefix, message))
+        log.info("[%s]: %s" % (prefix, message))
 
     def log_debug(self, client: dict, message: str) -> None:
         prefix = self.format_log_prefix(client)
 
-        logger.debug("[%s]: %s" % (prefix, message))
+        log.debug("[%s]: %s" % (prefix, message))
 
     def format_log_prefix(self, client: dict) -> str:
         prefix = "cid: %s" % (client["cid"],)
