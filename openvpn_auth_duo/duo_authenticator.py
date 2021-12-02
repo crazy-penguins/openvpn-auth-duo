@@ -118,8 +118,20 @@ class DuoAuthenticator(object):
 
         return client
 
+    def vpn_command(self, message):
+        self._openvpn.send_command(message)
+
     def authenticate_client(self, client: Dict):
-        pass
+        username = client['env']['common_name']
+        log.info('username: %s', username)
+        duo = self.auth.auth('push', username, device='auto')
+        if duo.get('success'):
+            self.vpn_command(f"client-auth-nt {client['cid']} {client['kid']}")
+        else:
+            self.vpn_command(
+                'client-deny {client["cid"]} {client["kid"]} "no_response" '
+                '"we did not receive a response from duo"'
+            )
 
     def client_connect(self, data: str) -> None:
         client = self.parse_client_data(data)
