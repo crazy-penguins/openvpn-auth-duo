@@ -15,7 +15,7 @@ setuptools.setup(
     version=__version__,
     entry_points={
         'console_scripts': [
-            'openvpn-auth-duo = openvpn_auth_duo.cli:main',
+            'openvpn-auth-duo = openvpn_auth_duo.duo_cli:main',
         ],
     },
     license="MIT",

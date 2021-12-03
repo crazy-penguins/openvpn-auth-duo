@@ -1,5 +1,4 @@
 import logging
-import os
 
 import configargparse
 from concurrent_log_handler.queue import setup_logging_queues
@@ -114,33 +113,8 @@ def main():
     parser_openvpn.add_argument(
         "-p",
         "--ovpn-password",
-        help="Passwort for OpenVPN management interface.",
+        help="Password for OpenVPN management interface.",
         env_var="AAD_OVPN_PASSWORD",
-    )
-
-    parser_aad = parser.add_argument_group("Azure AD settings")
-    parser_aad.add_argument(
-        "--client-id",
-        required=True,
-        help="Client ID of application.",
-        env_var="AAD_CLIENT_ID",
-    )
-    parser_aad.add_argument(
-        "--token-authority",
-        default=os.environ.get(
-            "authority", default="https://login.microsoftonline.com/organizations"
-        ),
-        env_var="AAD_TOKEN_AUTHORITY",
-        help="A URL that identifies a token authority. It should be of the format "
-        "https://login.microsoftonline.com/your_tenant. By default, we will use "
-        "https://login.microsoftonline.com/organizations",
-    )
-    parser_aad.add_argument(
-        "--graph-endpoint",
-        default="https://graph.microsoft.com/v1.0/",
-        env_var="AAD_GRAPH_ENDPOINT",
-        help="Endpoint of the graph API. See: "
-        "https://developer.microsoft.com/en-us/graph/graph-explorer",
     )
 
     parser_prometheus = parser.add_argument_group("Prometheus settings")
@@ -187,10 +161,6 @@ def main():
         i = Info("openvpn_auth_azure_ad_version", "info of openvpn-auth-azure-ad")
         i.info({"version": __version__})
 
-    # app = msal.PublicClientApplication(
-    #     options.client_id, authority=options.token_authority
-    # )
-    #
     authenticator = DuoAuthenticator(
         ikey=options.ikey,
         skey=options.skey,

@@ -125,11 +125,12 @@ class DuoAuthenticator(object):
         username = client['env']['common_name']
         log.info('username: %s', username)
         duo = self.auth.auth('push', username, device='auto')
-        if duo.get('success'):
+        log.info('[duo] %s', duo)
+        if duo.get('status') == 'allow':
             self.vpn_command(f"client-auth-nt {client['cid']} {client['kid']}")
         else:
             self.vpn_command(
-                'client-deny {client["cid"]} {client["kid"]} "no_response" '
+                f'client-deny {client["cid"]} {client["kid"]} "no_response" '
                 '"we did not receive a response from duo"'
             )
 
@@ -149,3 +150,4 @@ class DuoAuthenticator(object):
         client = self.parse_client_data(data)
         log.info('[%s] Received client reauth event', client['cid'])
         openvpn_duo_events.labels('reauth').inc()
+        self.vpn_command(f"client-auth-nt {client['cid']} {client['kid']}")
