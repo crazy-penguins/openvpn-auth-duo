@@ -16,6 +16,7 @@ setuptools.setup(
     entry_points={
         'console_scripts': [
             'openvpn-auth-duo = openvpn_auth_duo.duo_cli:main',
+            'openvpn-auth-totp = openvpn_auth_duo.totp_cli:main',
         ],
     },
     license="MIT",
@@ -25,10 +26,13 @@ setuptools.setup(
     "against duo.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/crazy-penguins/openvpn-auth-azure-ad",
-    download_url="https://github.com/crazy-penguins/openvpn-auth-azure-ad/archive/v%s.tar.gz"
+    url="https://github.com/crazy-penguins/openvpn-auth-duo",
+    download_url="https://github.com/crazy-penguins/openvpn-auth-duo/archive/v%s.tar.gz"
     % __version__,
     packages=setuptools.find_packages(),
+    package_data={
+        'openvpn_auth_duo': [ '*.sql', ]
+    },
     keywords=["OpenVPN", "AzureAD", "authentication", 'duo'],
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -45,11 +49,16 @@ setuptools.setup(
         'prometheus_client~=0.8',
         'concurrent-log-handler~=0.9',
         'duo-client',
+        'mysql-connector-python',
+        'pyotp',
+        'setuptools',
+        'qrcode',
+        'pytz',
     ],
     project_urls={
-        "Changelog": "https://github.com/crazy-penguins/openvpn-auth-azure-ad/blob/v%s/CHANGELOG.md"
+        "Changelog": "https://github.com/crazy-penguins/openvpn-auth-duo/blob/v%s/CHANGELOG.md"
         % __version__,
-        "Source": "https://github.com/crazy-penguins/openvpn-auth-azure-ad",
-        "Bug Reports": "https://github.com/crazy-penguins/openvpn-auth-azure-ad/issues",
+        "Source": "https://github.com/crazy-penguins/openvpn-auth-duo",
+        "Bug Reports": "https://github.com/crazy-penguins/openvpn-auth-duo/issues",
     },
 )

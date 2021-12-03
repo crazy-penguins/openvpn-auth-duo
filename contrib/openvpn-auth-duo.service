@@ -1,0 +1,14 @@
+[Unit]
+Description=openvpn-auth-duo
+After=openvpn.service
+Wants=openvpn.service
+Documentation=https://github.com/crazy-penguins/openvpn-auth-duo
+
+[Service]
+PrivateTmp=true
+ExecStart=/usr/local/bin/openvpn-auth-duo
+ProtectSystem=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

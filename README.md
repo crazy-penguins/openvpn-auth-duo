@@ -156,24 +156,34 @@ for detailed `management` settings.
 ### client.conf
 
 ```
-auth-user-pass
+auth-user-pass pass.txt
 auth-retry interact
 ```
 
 `auth-user-pass` is always required otherwise dynamic challenges will not work.
+for totp and duo, we create a dummy pass.txt file with the values
+
+```
+username
+password
+```
+
+since the username for duo and totp storage are tied to the cert
+common name.
 
 # Prometheus support
 
-openvpn-auth-azure-ad has some built-in prometheus support to collect some statistics about authenticators. By default,
-the prometheus endpoint listen on port 9723.
+openvpn-auth-duo has some built-in prometheus support to collect some
+statistics about authenticators. By default, the prometheus endpoint listen on port 9723.
 
 # Related projects
 
-- https://github.com/CyberNinjas/openvpn-auth-aad
 - https://github.com/stilljake/openvpn-azure-ad-auth
+- https://github.com/jkroepke/openvpn-auth-azure-ad
 
 # Copyright and license
 
 © [2020 Jan-Otto Kröpke (jkroepke)](https://github.com/jkroepke/helm-secrets)
+© 2021 Preetam Shingavi (2ps)
 
 Licensed under the [MIT License](LICENSE.txt)

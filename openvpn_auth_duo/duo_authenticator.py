@@ -54,7 +54,7 @@ class DuoAuthenticator(object):
         self._thread_pool = ThreadPoolExecutorStackTraced(max_workers=threads)
 
     def run(self) -> None:
-        log.info("Running openvpn-auth-duo %s" % __version__)
+        log.info('Running openvpn-auth-duo %s', __version__)
         try:
             while True:
                 message = self._openvpn.receive()
