@@ -42,6 +42,9 @@ class TotpAuthenticator(object):
         mysql_password: str,
         mysql_database: str,
         threads: int,
+        ldap_enabled: bool = False,
+        ldap_search_base: str = None,
+        ldap_servers: str = None,
         host: str = None,
         port: int = None,
         unix_socket: str = None,
@@ -54,6 +57,9 @@ class TotpAuthenticator(object):
         self.mysql_pool_name = 'totp_authenticator'
         self.mysql_pool_size = threads
         self.mysql_database = mysql_database
+        self.ldap_enabled = ldap_enabled
+        self.ldap_search_base = ldap_search_base
+        self.ldap_servers = ldap_servers
         self.token_expiration = token_expiration
         if (host and port) or unix_socket:
             self._openvpn = ManagementInterface(host, port, unix_socket, password)
@@ -151,10 +157,13 @@ class TotpAuthenticator(object):
                     client['reason'] = client_info[0].replace('>CLIENT:', '').lower()
                     client['cid'] = client_info[1]
                 elif line.startswith('>CLIENT:ENV,'):
-                    client_env = line.split(',')[1].split('=')
-                    client['env'][client_env[0]] = (
-                        client_env[1] if len(client_env) == 2 else ''
-                    )
+                    env_line = line.split(',', 1)[-1]
+                    if env_line != 'END':
+                        if '=' in env_line:
+                            pieces = env_line.split('=', 1)
+                            client['env'][pieces[0].lower()] = pieces[1]
+                        else:
+                            client['env'][env_line] = ''
                 else:
                     raise errors.ParseError(f"Can't parse line: {line}")
             except Exception:
@@ -182,40 +191,115 @@ class TotpAuthenticator(object):
         self.vpn_command(f"client-auth-nt {client['cid']} {client['kid']}")
         self.save_last_login(username, untrusted_ip, last)
 
+    @classmethod
+    def decode_password(cls, client):
+        env = client['env']
+        password = env['password']
+        decode = False
+        if password.startswith('CRV1'):
+            password = password.split('::')[-1]
+        elif password.startswith('SCRV1'):
+            password = password.split(':')[1]
+            decode = True
+        if decode:
+            password = password.encode('utf-8')
+            password = b64decode(password).decode('utf-8')
+        return password
+
+    def connect_to_ldap(self, upn, password, ldap_servers=None):
+        from ldap3 import ServerPool as LdapServerPool
+        from ldap3 import Connection as LdapConnection
+        from ldap3 import ROUND_ROBIN
+        ldap_servers = ldap_servers or self.ldap_servers
+        log.debug('[ldap] servers: %s', ldap_servers)
+        ldap_servers = ldap_servers.split(',')
+        ldap_servers = [ x.strip() for x in ldap_servers ]
+        pool = LdapServerPool(ldap_servers, ROUND_ROBIN)
+        ldap_connection = LdapConnection(pool, upn, password)
+        return ldap_connection
+
+    @classmethod
+    def lowercase_dict(cls, data):
+        return { key.lower(): value for key, value in data.items() }
+
+    def authenticate_via_ldap(self, client):
+        from ldap3 import ALL_ATTRIBUTES
+        if not self.ldap_enabled:
+            return True, [], None
+        env = client['env']
+        upn = env['common_name']
+        password = self.decode_password(client)
+        ldap_servers, ldap_search_base = self.get_ldap_settings(client)
+        ldap_connection = self.connect_to_ldap(upn, password, ldap_servers)
+        if not ldap_connection.bind():
+            log.info('authentication via ldap failed')
+            return False, [], None
+        log.debug('[ldap] base: %s', self.ldap_search_base)
+        ldap_connection.search(
+            ldap_search_base or self.ldap_search_base,
+            '(&'
+            f'(userprincipalname={upn})'
+            '(objectClass=user)'
+            '(!(userAccountControl:1.2.840.113556.1.4.803:=2)))',
+            attributes=ALL_ATTRIBUTES)
+        response = ldap_connection.response
+        ldap_connection.unbind()
+        if not response:
+            return False, [], None
+        response = response[0]
+        attrs = self.lowercase_dict(response['attributes'])
+        log.info('authentication via ldap successful')
+        return True, attrs.get('memberof') or [], attrs.get('openvpn_totp')
+
+    def query_secret_key(self, username):
+        results = self.query(
+            'select * from totp where email=%s',
+            [ username ])
+        log.info('[results] found %s results', len(results))
+        if not results:
+            log.info('username not found in totp table, denying login')
+            return None
+        return results[0]['secret_key']
+
     def authenticate_client(self, client: Dict):
         env = client['env']
         username = env['common_name']
         password = env['password']
         log.info('username: %s', username)
         log.debug('password: %s', password)
-        for key, value in env.items():
-            log.debug('[env] %s => %s', key, value)
+        # for key, value in env.items():
+        #     log.debug('[env] %s => %s', key, value)
         untrusted_ip = env['untrusted_ip']
         last = self.last_login(username, untrusted_ip)
         delta = timedelta(days=self.token_expiration)
+        secret_key = None
         if last and datetime.now(tz=pytz.utc) - last <= delta:
             # if a user has signed in from this ip within the last 15 days
             # don't request another otp code
             self.vpn_command(f"client-auth-nt {client['cid']} {client['kid']}")
             return
+
+        if self.ldap_enabled:
+            result, groups, secret_key = self.authenticate_via_ldap(client)
+            if not result:
+                self.vpn_command(
+                    f'client-deny {client["cid"]} {client["kid"]} "bad_response" '
+                    '"incorrect username or password"'
+                )
+
         crv1 = password.startswith('CRV1') or password.startswith('SCRV1')
         totp_in_password = len(password) == 6 and password.isdigit()
         log.info('crv1: %s', crv1)
         log.info('totp_in_password: %s', totp_in_password)
         if crv1 or totp_in_password:
-            results = self.query(
-                'select * from totp where email=%s',
-                [ username ])
-            log.info('[results] found %s results', len(results))
-            if not results:
-                log.info('username not found in totp table, denying login')
+            secret_key = secret_key or self.query_secret_key(username)
+            if not secret_key:
                 self.vpn_command(
                     f'client-deny {client["cid"]} {client["kid"]} "no_response" '
                     '"user not authorized for logon"'
                 )
                 return
-            result = results[0]
-            otp = TOTP(result['secret_key'])
+            otp = TOTP(secret_key)
             pieces = password.split(':')
             totp_response = pieces[-1]
             log.info('response: %s', totp_response)
@@ -236,8 +320,6 @@ class TotpAuthenticator(object):
     def send_client_challenge(self, client: dict, challenge):
         username = client['env']['username']
         username_b64 = b64encode_string(username)
-        state_id = sha256(username.encode('utf-8')).digest()
-        state_id = b64encode(state_id).decode('utf-8')
         state_id = generated_id()
         challenge = f'CRV1:E,R:{state_id}:{username_b64}:{challenge}'
         self.vpn_command(
@@ -260,7 +342,7 @@ class TotpAuthenticator(object):
         client = self.parse_client_data(data)
         log.info('[%s] Received client reauth event', client['cid'])
         openvpn_totp_events.labels('reauth').inc()
-        self.vpn_command(f"client-auth-nt {client['cid']} {client['kid']}")
+        self.authenticate_client(client)
 
     def save_last_login(self, username, ip, last):
         if last:
@@ -277,3 +359,35 @@ class TotpAuthenticator(object):
                 ' values (%s, %s)', [username, ip, ]
             )
 
+    def register_ldap_domain(self, ldap_domain):
+        log.info('[ldap] registering %s', ldap_domain)
+        sql = 'select domain from ldap_settings where domain=%s'
+        domains = self.query(sql, [ ldap_domain ])
+        params = [ self.ldap_servers, self.ldap_search_base, ldap_domain ]
+        if domains:
+            log.info('[ldap] updating entries for %s', ldap_domain)
+            sql = """
+            update ldap_settings set servers=%s, search_base=%s
+            where domain=%s
+            """
+        else:
+            log.info('[ldap] inserting new entry for %s', ldap_domain)
+            sql = """
+            insert into ldap_settings (servers, search_base, domain) values (
+              %s, %s, %s
+            )
+            """
+        self.query(sql, params)
+
+    def get_ldap_settings(self, client):
+        env = client['env']
+        upn = env['common_name']
+        domain = upn.split('@')[-1]
+        if not upn:
+            return None, None
+        sql = 'select servers, search_base from ldap_settings where domain=%s'
+        domains = self.query(sql, [ domain ])
+        domains = domains or self.query(sql, [ 'default' ]) or []
+        for x in domains:
+            return x['servers'], x['search_base']
+        return None, None

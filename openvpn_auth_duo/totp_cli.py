@@ -131,6 +131,33 @@ def main():
         env_var='AAD_VERIFY_COMMON_NAME',
     )
 
+    ldap_options = parser.add_argument_group('ldap settings')
+    ldap_options.add_argument(
+        '--ldap-enabled',
+        help='indicates whether to authenticate the username / password with ldap.',
+        env_var='OVAD_LDAP_ENABLED',
+        action='store_true',
+    )
+    ldap_options.add_argument(
+        '--ldap-servers',
+        help='the ldap servers to try for authentication',
+        env_var='OVAD_LDAP_SERVERS',
+    )
+    ldap_options.add_argument(
+        '--ldap-search-base',
+        help='the ldap search base e.g. "DC=contoso,DC=com"',
+        env_var='OVAD_LDAP_SEARCH_BASE',
+    )
+    ldap_options.add_argument(
+        '--register-ldap-domain',
+        help='allows registration of a domain. saves settings in the database',
+        action='store_true',
+    )
+    ldap_options.add_argument(
+        '--ldap-domain',
+        help='the ldap domain you want to register'
+    )
+
     parser_openvpn = parser.add_argument_group('OpenVPN Management Interface settings')
     parser_openvpn.add_argument(
         '-H',
@@ -208,6 +235,9 @@ def main():
         mysql_password=options.mysql_password,
         mysql_database=options.mysql_database,
         threads=options.threads,
+        ldap_enabled=options.ldap_enabled,
+        ldap_servers=options.ldap_servers,
+        ldap_search_base=options.ldap_search_base,
         host=options.ovpn_host,
         port=options.ovpn_port,
         unix_socket=options.ovpn_socket,
@@ -261,5 +291,7 @@ def main():
             qr_code(uri)
         else:
             log.info('[enroll] %s does not exist', email)
+    elif options.register_ldap_domain:
+        authenticator.register_ldap_domain(options.ldap_domain)
     else:
         authenticator.run()
