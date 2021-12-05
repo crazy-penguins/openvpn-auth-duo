@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 import logging
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from typing import Dict
 from hashlib import sha256
 from cacheout import CacheManager
@@ -198,7 +198,11 @@ class TotpAuthenticator(object):
             # don't request another otp code
             self.vpn_command(f"client-auth-nt {client['cid']} {client['kid']}")
             return
-        if password.startswith('CRV1'):
+        crv1 = password.startswith('CRV1') or password.startswith('SCRV1')
+        totp_in_password = len(password) == 6 and password.isdigit()
+        log.info('crv1: %s', crv1)
+        log.info('totp_in_password: %s', totp_in_password)
+        if crv1 or totp_in_password:
             results = self.query(
                 'select * from totp where email=%s',
                 [ username ])
@@ -212,9 +216,13 @@ class TotpAuthenticator(object):
                 return
             result = results[0]
             otp = TOTP(result['secret_key'])
-            pieces = password.split('::')
+            pieces = password.split(':')
             totp_response = pieces[-1]
             log.info('response: %s', totp_response)
+            if pieces[0] == 'SCRV1':
+                response_bytes = totp_response.encode('utf-8')
+                totp_response = b64decode(response_bytes).decode('utf-8')
+                log.info('response: %s', totp_response)
             if otp.verify(totp_response):
                 self.authenticated(client, last)
             else:
