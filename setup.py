@@ -54,6 +54,7 @@ setuptools.setup(
         'setuptools',
         'qrcode',
         'pytz',
+        'ldap3',
     ],
     project_urls={
         "Changelog": "https://github.com/crazy-penguins/openvpn-auth-duo/blob/v%s/CHANGELOG.md"

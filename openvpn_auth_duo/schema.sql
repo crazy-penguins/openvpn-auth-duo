@@ -13,3 +13,12 @@ create table if not exists last_sign_in (
 create index idx_totp_authenticator_email on last_sign_in (email);
 create index idx_totp_authenticator_email_and_ip on last_sign_in (email, ip_address);
 
+create table if not exists ldap_settings (
+    id int not null auto_increment primary key
+  , domain varchar(120)
+  , servers varchar(255)
+  , search_base varchar(120)
+);
+create index idx_ldap_settings_domain on ldap_settings (domain);
+
+
