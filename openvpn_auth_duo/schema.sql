@@ -21,4 +21,11 @@ create table if not exists ldap_settings (
 );
 create index idx_ldap_settings_domain on ldap_settings (domain);
 
+create table if not exists trusted_device_token (
+    id int not null auto_increment primary key
+  , username varchar(120)
+  , ip_address varchar(16)
+  , token varchar(120)
+);
+create index idx_trusted_device_token_username_ip on trusted_device_token (username, ip_address);
 
